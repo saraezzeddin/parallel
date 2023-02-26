@@ -1,0 +1,86 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <mpi.h>
+#include <sys/time.h>
+
+#define WIDTH 5000
+#define HEIGHT 5000
+
+int mandelbrot(double x, double y, int max_iters) {
+    int i;
+    double real = x;
+    double imag = y;
+    for (i = 0; i < max_iters; i++) {
+        double r2 = real*real;
+        double i2 = imag*imag;
+        if (r2 + i2 > 4.0) {
+            return i;
+        }
+        imag = 2*real*imag + y;
+        real = r2 - i2 + x;
+    }
+    return max_iters;
+}
+
+int main(int argc, char** argv) {
+    int rank, size, i, j, start, end, chunk_size;
+    int max_iters = 1000;
+    int pixels[WIDTH][HEIGHT];
+    double x_min = -2.0;
+    double x_max = 2.0;
+    double y_min = -2.0;
+    double y_max = 2.0;
+    double x, y;
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    chunk_size = WIDTH / size;
+    start = rank * chunk_size;
+    end = start + chunk_size;
+    if (rank == size - 1) {
+        end = WIDTH;
+    }
+    
+    struct timeval t1, t2;
+    double elapsedTime;
+    
+    gettimeofday(&t1, NULL);
+    
+    for (i = start; i < end; i++) {
+        for (j = 0; j < HEIGHT; j++) {
+            x = x_min + i * (x_max - x_min) / WIDTH;
+            y = y_min + j * (y_max - y_min) / HEIGHT;
+            pixels[i][j] = mandelbrot(x, y, max_iters);
+        }
+    }
+    
+    MPI_Gather(pixels + start, chunk_size * HEIGHT, MPI_INT, pixels, chunk_size * HEIGHT, MPI_INT, 0, MPI_COMM_WORLD);
+    
+    if (rank == 0) {
+        printf("P2\n%d %d\n%d\n", WIDTH, HEIGHT, max_iters);
+        for (i = 0; i < WIDTH; i++) {
+            for (j = 0; j < HEIGHT; j++) {
+                printf("%d ", pixels[i][j]);
+            }
+            printf("\n");
+        }
+        
+        FILE *fp;
+        fp = fopen("image2.pgm", "w");
+        fprintf(fp, "P2\n%d %d\n%d\n", WIDTH, HEIGHT, max_iters);
+        for (i = 0; i < WIDTH; i++) {
+            for (j = 0; j < HEIGHT; j++) {
+                fprintf(fp, "%d ", pixels[i][j]);
+            }
+            fprintf(fp, "\n");
+        }
+        fclose(fp);
+        
+        gettimeofday(&t2, NULL);
+        elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
+        elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
+        printf("Total time: %f ms\n", elapsedTime);
+    }
+    MPI_Finalize();
+    return 0;
+}
