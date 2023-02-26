@@ -1,0 +1,41 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <time.h>
+
+#define MAX_ITER 1000
+#define WIDTH 800
+#define HEIGHT 800
+
+int mandelbrot(double x0, double y0) {
+    double x = 0.0, y = 0.0;
+    int iter = 0;
+    while (x*x + y*y <= 4.0 && iter < MAX_ITER) {
+        double xtemp = x*x - y*y + x0;
+        y = 2.0*x*y + y0;
+        x = xtemp;
+        iter++;
+    }
+    return iter;
+}
+
+int main() {
+    clock_t start_time = clock();
+    int* image = (int*)malloc(sizeof(int) * WIDTH * HEIGHT);
+    double xmin = -2.0, xmax = 1.0, ymin = -1.5, ymax = 1.5;
+    double xstep = (xmax - xmin) / (double)WIDTH;
+    double ystep = (ymax - ymin) / (double)HEIGHT;
+    int row, col;
+    for (row = 0; row < HEIGHT; row++) {
+        for (col = 0; col < WIDTH; col++) {
+            double x = xmin + (double)col * xstep;
+            double y = ymin + (double)row * ystep;
+            int iter = mandelbrot(x, y);
+            image[row*WIDTH+col] = iter;
+        }
+    }
+    clock_t end_time = clock();
+    printf("Time taken: %.2fs\n", (double)(end_time - start_time) / CLOCKS_PER_SEC);
+    free(image);
+    return 0;
+}
